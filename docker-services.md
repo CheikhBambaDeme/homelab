@@ -29,17 +29,15 @@ Any new app's compose file should join this network (`networks: { web: { externa
 ### Caddy (reverse proxy)
 - Image: `caddy:latest`, container name `caddy`
 - Config file: `~/docker-apps/caddy/Caddyfile` (bind-mounted into the container)
-- Publishes host ports 80 and 81. 443 is deliberately left unpublished so
+- Publishes host port 80 **only**. 443 is deliberately left unpublished so
   `tailscale serve` can bind it on the Tailscale interface — Docker publishing
   `443:443` grabs `0.0.0.0:443`, which shadows the Tailscale IP and makes every
   HTTPS connection fail the TLS handshake with no useful error. This bit during
   the Agelcom deployment. **TLS on this server is terminated by Tailscale, never
   by Caddy**; if you ever need Caddy to terminate TLS itself, you must move
   `tailscale serve` to another port first.
-- Routes by hostname on `:80`, and by port on `:81`. Agelcom is the site behind
-  `:80`, with the placeholder kept as the catch-all for anything else; GymLog is
-  behind `:81`, because both apps answer to the *same* hostname — see its section
-  below for why that forces a second port:
+- Routes by hostname. Agelcom is the only real site behind it; the placeholder
+  block is kept as the catch-all for anything else:
   ```
   lacrevetteserver.tail9991b1.ts.net:80 {
       reverse_proxy agelcom:8000 {
@@ -50,12 +48,6 @@ Any new app's compose file should join this network (`networks: { web: { externa
   :80 {
       respond "Caddy is running. Add your sites here." 200
   }
-
-  :81 {
-      reverse_proxy gymlog:8000 {
-          header_up X-Forwarded-Proto https
-      }
-  }
   ```
   **Why `:80` and a forced `X-Forwarded-Proto`:** TLS is terminated by
   `tailscale serve` in front of Caddy, so Caddy must *not* try to provision its
@@ -63,8 +55,6 @@ Any new app's compose file should join this network (`networks: { web: { externa
   the backend the original connection was HTTPS — otherwise an app that enforces
   HTTPS answers every request with a redirect loop. Copy this shape for the next
   Tailscale-served site.
-  The pre-GymLog versions of this file and of `~/docker-apps/docker-compose.yml`
-  are kept beside them on the server as `*.bak-2026-09-14`.
 - Access: `http://100.82.241.64` (Tailscale) or `http://192.168.1.160` (LAN)
 - To add a new site, edit the Caddyfile then reload without restarting the container:
   ```bash
@@ -74,7 +64,9 @@ Any new app's compose file should join this network (`networks: { web: { externa
 - **A new *port*, though, needs the container recreated**, not just a reload — the
   publish list is fixed at container creation. `docker compose up -d caddy` from
   `~/docker-apps/` does it, and costs every site behind Caddy a couple of seconds
-  of downtime. That is how port 81 was added for GymLog.
+  of downtime.
+- Caddy is not in GymLog's path at all: that app has its own Tailscale node and
+  its own 443. See its section below.
 
 ---
 
@@ -189,7 +181,8 @@ remote, so the server copy is synced with rsync by `deploy/push.sh` in that repo
 
 ### App (`gymlog`)
 - Image built locally from the repo's `Dockerfile` (Python 3.12 + gunicorn, 3 workers)
-- **No published host port** — reached purely through Caddy over the `web` network
+- **No published host port** — reached only by its own Tailscale node, over the
+  shared `web` Docker network. Caddy is not involved.
 - `collectstatic` and `migrate` run from the container entrypoint at every start;
   the exercise library (85 exercises) is loaded by a data migration, so a fresh
   database is usable immediately
@@ -197,30 +190,51 @@ remote, so the server copy is synced with rsync by `deploy/push.sh` in that repo
   hardcode `localhost` there: it is not a trusted host, so Django answers 400 and
   the container never goes healthy. This cost one rolled-back deploy.
 
+### Its own node on the tailnet (`gymlog-ts`)
+- Image: `tailscale/tailscale:v1.102.3`, container name `gymlog-ts`, in GymLog's
+  own compose stack. Userspace networking, so it needs no capabilities and no
+  `/dev/net/tun`.
+- It owns the tailnet name **`gymlog`**, gets its own Let's Encrypt certificate,
+  and terminates TLS on its own 443 — which lives inside the container's network
+  namespace and so collides with nothing on the host.
+- Login and serve config both persist in the `gymlog_ts_state` volume.
+  `deploy/tailscale-node.sh` in the app repo drives both, once.
+- **Three gotchas, two of which cost a debugging session here:**
+  - It runs `tailscaled` **directly**, not the image's default `containerboot`
+    entrypoint. containerboot allows an interactive login sixty seconds before it
+    kills tailscaled and re-registers with a fresh node key, so the URL it prints
+    is dead before anyone can click it, and the container restart-loops. Set
+    `TS_AUTHKEY` if you want containerboot's convenience back.
+  - The service must **not** declare `hostname: gymlog` in compose. Docker writes
+    a container's own hostname into its `/etc/hosts`, which makes `gymlog` resolve
+    to the node container itself — the serve proxy then loops back to itself
+    instead of reaching the app. The tailnet name comes from
+    `tailscale up --hostname`, not from Docker.
+  - Its proxy target is the app's **container** name (`gymlog:8000`), never the
+    compose service name `app`: the `web` network is shared, and Agelcom has a
+    service called `app` on it too, so that alias is ambiguous.
+
 ### How it is reached
 ```
-Phone --HTTPS--> tailscale serve --HTTP--> Caddy  --HTTP--> gunicorn
-        (:8443)    (on the host)          (:81)           (gymlog:8000)
+Phone --HTTPS--> gymlog-ts (Tailscale node) --HTTP--> gunicorn
+        (:443)     (in Docker, userspace)            (gymlog:8000)
 ```
-- Address: **<https://lacrevetteserver.tail9991b1.ts.net:8443>**
-- **Why a port and not a hostname:** Tailscale issues one certificate per machine
-  name, and Agelcom already holds `tailscale serve` on 443 for
-  `lacrevetteserver.tail9991b1.ts.net`. A second app therefore either lives under
-  a path prefix on the same origin — which would mean running Django under
-  `FORCE_SCRIPT_NAME` and narrowing the service worker's scope — or takes its own
-  HTTPS port. The port is the cheaper trade, and the same Let's Encrypt cert
-  covers it, because a certificate is issued for a host, not a host:port.
-- Enabled with, once:
-  ```bash
-  tailscale serve --bg --https=8443 http://127.0.0.1:81
-  ```
-  No ufw rule is needed: traffic arrives on `tailscale0`, which already allows
-  every port, and reaches Caddy over loopback.
-- **`PUBLIC_ORIGIN` gotcha:** Django's CSRF check compares scheme, host *and
-  port*, so `CSRF_TRUSTED_ORIGINS` cannot be derived from `ALLOWED_HOSTS` the way
-  Agelcom does it. `PUBLIC_ORIGIN=https://lacrevetteserver.tail9991b1.ts.net:8443`
-  is a required env var; get it wrong and every POST answers 403 while GETs look
-  perfectly fine.
+- Address: **<https://gymlog.tail9991b1.ts.net>**
+- No Caddy, no host port, no ufw rule.
+- `tailscale serve` sets `X-Forwarded-Proto: https` itself (verified on this
+  machine), which is the only header Django needs in order not to answer every
+  request with an HTTPS redirect.
+- **Why not a second port on the machine's name?** That is how it shipped first,
+  at `:8443`, and it was undone on 2026-09-14. Android matches an installed PWA on
+  scheme, host and path but **never on port**, so Agelcom's WebAPK claimed every
+  HTTPS URL on the shared host: installing GymLog said it was already installed,
+  and opening its URL launched Agelcom with GymLog rendered inside it. Cookies
+  ignore ports too, so both Django apps were overwriting each other's `csrftoken`.
+  **Do not put a third app on `lacrevetteserver.tail9991b1.ts.net`.** Give it its
+  own node.
+- `PUBLIC_ORIGIN=https://gymlog.tail9991b1.ts.net` is a required env var: Django's
+  CSRF check compares scheme, host and port, and `CSRF_TRUSTED_ORIGINS` is built
+  from it. Get it wrong and GETs look perfectly fine while every POST returns 403.
 
 **No authentication at all**, same as Agelcom: whoever is on the tailnet and has
 the URL has the training log. It is personal data rather than a business's, so

@@ -42,16 +42,11 @@ This is the standard pattern used for everything on this server so far (Portaine
      ```
      Requires "HTTPS Certificates" enabled at <https://login.tailscale.com/admin/dns>, and `sudo tailscale set --operator=$USER` once per machine.
 
-     **A second app that also needs real HTTPS cannot have its own hostname.** Tailscale issues one certificate per machine name, and 443 is already taken by Agelcom. Give the new app its own HTTPS port instead, terminating on its own Caddy listener — GymLog is the worked example:
+     **A second app that also needs real HTTPS cannot share the machine's name.** Tailscale issues one certificate per machine name, and 443 for `lacrevetteserver` belongs to Agelcom. Give the new app **its own node on the tailnet**: a `tailscale/tailscale` container inside that app's own compose stack, which claims its own name, gets its own certificate and terminates its own 443. GymLog is the worked example — see `docker-services.md` for the compose service and the two gotchas in it.
 
-     ```bash
-     # in ~/docker-apps/docker-compose.yml, publish the new port on caddy: "81:81"
-     # in ~/docker-apps/caddy/Caddyfile, add a `:81 { reverse_proxy <app>:8000 { header_up X-Forwarded-Proto https } }` block
-     cd ~/docker-apps && docker compose up -d caddy    # a port change needs the container recreated, not a reload
-     tailscale serve --bg --https=8443 http://127.0.0.1:81
-     ```
+     A second *port* on the shared name is the obvious shortcut and it does not work. It was tried first for GymLog and had to be undone, because **a port is not an origin boundary where it matters**: Android matches an installed PWA on scheme, host and path but never on port, so Agelcom's installed app swallowed every GymLog URL; and cookies ignore ports outright, so both Django apps were overwriting each other's `csrftoken`.
 
-     The same certificate covers it — a certificate is issued for a host, not a host:port. The cost is that **any framework check that compares the port has to be told about it**: Django's CSRF check does, so GymLog carries a required `PUBLIC_ORIGIN` env var with the port in it. Without that, GETs work perfectly and every POST returns 403.
+     Tailscale's named services (`tailscale serve --service=…`) would avoid the extra container, but they require the host to be a **tagged** node — a bigger change to the tailnet than adding one container to one stack.
 
      **Nothing else may publish host port 443** — Docker's `443:443` binds `0.0.0.0:443` and shadows the Tailscale interface, so `tailscale serve` silently loses the port and every HTTPS connection dies in the TLS handshake with no log entry anywhere. Caddy's 443 publish was removed for exactly this reason. Two things must then be right in the Caddyfile, or the app breaks in confusing ways — write the site block as `host:80` so Caddy does not try to get its own certificate, and add `header_up X-Forwarded-Proto https` to the `reverse_proxy` so the backend knows the browser's connection really was HTTPS. Skipping the second one gives an infinite redirect loop on any app that enforces HTTPS. Copy Agelcom's block as the template.
    - **Via a dedicated published port (simple, used so far for Nextcloud and Portainer):** publish a host port in the compose file (`ports: ["XXXX:internal_port"]`). Pick a port not already in use — see the table in this file.
@@ -77,12 +72,12 @@ This is the standard pattern used for everything on this server so far (Portaine
 |---|---|
 | 22 | SSH |
 | 80 | Caddy (HTTP) — hostname-routed, Agelcom + catch-all |
-| 81 | Caddy (HTTP) — GymLog, behind `tailscale serve --https=8443` |
-| 443 | `tailscale serve` → Caddy :80 (Agelcom) — **not** Caddy itself |
+| 443 | `tailscale serve` on the *machine's* node → Caddy :80 (Agelcom) — **not** Caddy itself |
 | 8080 | Nextcloud |
-| 8443 | `tailscale serve` → Caddy :81 (GymLog) |
 | 9443 | Portainer (Tailscale-only, not on LAN) |
+
+An app with its own Tailscale node uses no host port at all: its 443 lives inside that container's own network namespace, so it never collides with the machine's. GymLog is the example.
 
 Update this table whenever a new dedicated port is used.
 
-Apps routed through Caddy do not appear here — they have no host port of their own. Agelcom and GymLog are both of those; the ports above are Caddy's listeners and Tailscale's, not the apps'.
+Apps routed through Caddy do not appear here — they have no host port of their own. Agelcom is one of those; the ports above are Caddy's listeners and Tailscale's, not the apps'.

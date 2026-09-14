@@ -29,10 +29,10 @@ Last updated: 2026-09-14
 - Every app lives in its own folder under `~/docker-apps/<app>/` on the server as an independent Docker Compose project — isolated, easy to inspect, easy to tear down.
 - A shared external Docker network called `web` lets any container be reverse-proxied through Caddy without extra networking work.
 - Where an app needs a certificate a browser genuinely trusts (a PWA, anything needing a secure context), `tailscale serve` terminates TLS in front of Caddy using a real Let's Encrypt cert for the machine's `*.ts.net` name — still no domain, still no ports forwarded. Agelcom is the worked example.
-- Tailscale issues **one certificate per machine name**, so a second app that also needs real HTTPS cannot have its own hostname. It gets its own *port* instead: GymLog is served on `:8443`, terminating on a second Caddy listener on host port 81. The certificate is the same one — a cert covers a host, not a port. See `docker-services.md`.
+- Tailscale issues **one certificate per machine name**, so a second app that also needs real HTTPS cannot share the machine's name. It runs **its own Tailscale node** instead — a `tailscale/tailscale` container inside that app's own compose stack, which claims its own name and its own 443. GymLog is the worked example, at `gymlog.tail9991b1.ts.net`. A second *port* on the shared name was tried first and failed: Android matches an installed PWA on host and path but not port, and cookies ignore ports entirely, so the two apps collided. See `docker-services.md`.
 
 ## What is running
-Portainer, Caddy, Nextcloud, **Agelcom** (a Django shop-management app, deployed 2026-09-13, at <https://lacrevetteserver.tail9991b1.ts.net>) and **GymLog** (Cheikh's own workout tracker, deployed 2026-09-14, at <https://lacrevetteserver.tail9991b1.ts.net:8443>).
+Portainer, Caddy, Nextcloud, **Agelcom** (a Django shop-management app, deployed 2026-09-13, at <https://lacrevetteserver.tail9991b1.ts.net>) and **GymLog** (Cheikh's own workout tracker, deployed 2026-09-14, at <https://gymlog.tail9991b1.ts.net>).
 
 Agelcom holds a real business's data and is the reason the "no backups" item in `open-todos.md` is the most pressing thing on this server. GymLog now adds a second Postgres database to that same gap.
 
