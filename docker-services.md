@@ -29,15 +29,17 @@ Any new app's compose file should join this network (`networks: { web: { externa
 ### Caddy (reverse proxy)
 - Image: `caddy:latest`, container name `caddy`
 - Config file: `~/docker-apps/caddy/Caddyfile` (bind-mounted into the container)
-- Publishes host port 80 **only**. 443 is deliberately left unpublished so
+- Publishes host ports 80 and 81. 443 is deliberately left unpublished so
   `tailscale serve` can bind it on the Tailscale interface — Docker publishing
   `443:443` grabs `0.0.0.0:443`, which shadows the Tailscale IP and makes every
   HTTPS connection fail the TLS handshake with no useful error. This bit during
   the Agelcom deployment. **TLS on this server is terminated by Tailscale, never
   by Caddy**; if you ever need Caddy to terminate TLS itself, you must move
   `tailscale serve` to another port first.
-- Routes by hostname. Agelcom is the first real site behind it; the placeholder
-  block is kept as the catch-all for anything else:
+- Routes by hostname on `:80`, and by port on `:81`. Agelcom is the site behind
+  `:80`, with the placeholder kept as the catch-all for anything else; GymLog is
+  behind `:81`, because both apps answer to the *same* hostname — see its section
+  below for why that forces a second port:
   ```
   lacrevetteserver.tail9991b1.ts.net:80 {
       reverse_proxy agelcom:8000 {
@@ -48,6 +50,12 @@ Any new app's compose file should join this network (`networks: { web: { externa
   :80 {
       respond "Caddy is running. Add your sites here." 200
   }
+
+  :81 {
+      reverse_proxy gymlog:8000 {
+          header_up X-Forwarded-Proto https
+      }
+  }
   ```
   **Why `:80` and a forced `X-Forwarded-Proto`:** TLS is terminated by
   `tailscale serve` in front of Caddy, so Caddy must *not* try to provision its
@@ -55,12 +63,18 @@ Any new app's compose file should join this network (`networks: { web: { externa
   the backend the original connection was HTTPS — otherwise an app that enforces
   HTTPS answers every request with a redirect loop. Copy this shape for the next
   Tailscale-served site.
+  The pre-GymLog versions of this file and of `~/docker-apps/docker-compose.yml`
+  are kept beside them on the server as `*.bak-2026-09-14`.
 - Access: `http://100.82.241.64` (Tailscale) or `http://192.168.1.160` (LAN)
 - To add a new site, edit the Caddyfile then reload without restarting the container:
   ```bash
   docker exec caddy caddy reload --config /etc/caddy/Caddyfile
   ```
   (a full `docker compose restart caddy` from `~/docker-apps/` also works)
+- **A new *port*, though, needs the container recreated**, not just a reload — the
+  publish list is fixed at container creation. `docker compose up -d caddy` from
+  `~/docker-apps/` does it, and costs every site behind Caddy a couple of seconds
+  of downtime. That is how port 81 was added for GymLog.
 
 ---
 
@@ -153,6 +167,82 @@ cd ~/docker-apps/agelcom
 docker compose logs -f app
 docker compose exec app python manage.py import_products data/produits_demo.xlsx
 docker compose exec -T db pg_dump -U agelcom agelcom | gzip > ~/backups/agelcom-$(date +%F).sql.gz
+```
+
+---
+
+## `~/docker-apps/gymlog/` — GymLog (workout tracker)
+
+Django app for tracking Cheikh's own gym sessions — routines, set-by-set logging,
+progression and volume. A PWA installed on his Android phone, built to log a full
+session with **no connection at all** (the gym has no signal and the server is
+behind Tailscale anyway); sets queue in IndexedDB and sync when the phone gets
+home. Source lives at `~/Desktop/gymlog` on Cheikh's laptop; there is no git
+remote, so the server copy is synced with rsync by `deploy/push.sh` in that repo.
+
+### Database (`gymlog-db`)
+- Image: `postgres:17-alpine`, container name `gymlog-db`
+- On an `internal`-only Docker network — not reachable from the host or other stacks
+- `POSTGRES_PASSWORD` was generated on the server and lives only in
+  `~/docker-apps/gymlog/.env` (mode `600`)
+- Volume: `gymlog_db_data`
+
+### App (`gymlog`)
+- Image built locally from the repo's `Dockerfile` (Python 3.12 + gunicorn, 3 workers)
+- **No published host port** — reached purely through Caddy over the `web` network
+- `collectstatic` and `migrate` run from the container entrypoint at every start;
+  the exercise library (85 exercises) is loaded by a data migration, so a fresh
+  database is usable immediately
+- The image's `HEALTHCHECK` reads its `Host` header out of `ALLOWED_HOSTS`. Do not
+  hardcode `localhost` there: it is not a trusted host, so Django answers 400 and
+  the container never goes healthy. This cost one rolled-back deploy.
+
+### How it is reached
+```
+Phone --HTTPS--> tailscale serve --HTTP--> Caddy  --HTTP--> gunicorn
+        (:8443)    (on the host)          (:81)           (gymlog:8000)
+```
+- Address: **<https://lacrevetteserver.tail9991b1.ts.net:8443>**
+- **Why a port and not a hostname:** Tailscale issues one certificate per machine
+  name, and Agelcom already holds `tailscale serve` on 443 for
+  `lacrevetteserver.tail9991b1.ts.net`. A second app therefore either lives under
+  a path prefix on the same origin — which would mean running Django under
+  `FORCE_SCRIPT_NAME` and narrowing the service worker's scope — or takes its own
+  HTTPS port. The port is the cheaper trade, and the same Let's Encrypt cert
+  covers it, because a certificate is issued for a host, not a host:port.
+- Enabled with, once:
+  ```bash
+  tailscale serve --bg --https=8443 http://127.0.0.1:81
+  ```
+  No ufw rule is needed: traffic arrives on `tailscale0`, which already allows
+  every port, and reaches Caddy over loopback.
+- **`PUBLIC_ORIGIN` gotcha:** Django's CSRF check compares scheme, host *and
+  port*, so `CSRF_TRUSTED_ORIGINS` cannot be derived from `ALLOWED_HOSTS` the way
+  Agelcom does it. `PUBLIC_ORIGIN=https://lacrevetteserver.tail9991b1.ts.net:8443`
+  is a required env var; get it wrong and every POST answers 403 while GETs look
+  perfectly fine.
+
+**No authentication at all**, same as Agelcom: whoever is on the tailnet and has
+the URL has the training log. It is personal data rather than a business's, so
+the trade is Cheikh's own to make.
+
+### Updating it
+From `~/Desktop/gymlog` on the laptop:
+```bash
+just deploy      # or ./deploy/push.sh
+```
+Rebuilds the Tailwind CSS, rsyncs the source (excluding the server's `.env`), then
+runs `deploy/release.sh deploy` **on the server**: snapshot, rebuild, wait for the
+container health check, smoke-test `/train/` through Caddy, and roll back
+automatically if either fails.
+
+### Admin commands
+```bash
+cd ~/docker-apps/gymlog
+docker compose logs -f app
+docker compose exec app python manage.py seed_exercises          # new library entries
+docker compose exec app python manage.py rebuild_exercise_stats  # recompute counters
+docker compose exec -T db pg_dump -U gymlog gymlog | gzip > ~/backups/gymlog-$(date +%F).sql.gz
 ```
 
 ---
