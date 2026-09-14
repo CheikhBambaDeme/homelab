@@ -1,12 +1,38 @@
 ---
 name: homelab-conventions
-description: How the lacrevetteserver homelab is built, and the specific mistakes it punishes — addresses and SSH, the shared `web` Docker network, Caddy behind `tailscale serve` for TLS, ufw scoping, where secrets live. Use whenever work involves deploying, hosting, reverse-proxying, HTTPS, firewall rules or Docker on that server.
+description: How the lacrevetteserver homelab is built, what hardware it has, and the specific mistakes it punishes — addresses and SSH, capacity, the shared `web` Docker network, Caddy behind `tailscale serve` for TLS, ufw scoping, where secrets live. Use whenever work involves deploying, hosting, reverse-proxying, HTTPS, firewall rules or Docker on that server — including just judging whether something would fit or run well on it.
 ---
 
 # lacrevetteserver: how this machine works
 
 An old laptop running Ubuntu Desktop, hosting Docker services for personal and
 family use. Nothing is exposed to the public internet, and there is no domain.
+
+## Hardware, for "would this fit"
+
+| | |
+|---|---|
+| CPU | 4 cores |
+| RAM | 15 GB total |
+| Disk | ~468 GB total, ~422 GB free as of last check |
+| Network | home Wi-Fi (`wlp1s0`); the Ethernet port is unplugged |
+| Power | a laptop with lid-close/sleep disabled, no UPS |
+
+Already running on it: Portainer, Caddy, Nextcloud, and Agelcom (a Django app
+with its own Postgres) — see "What is running" below. That's the baseline load
+already claiming a share of the 15 GB and 4 cores before anything new is added.
+
+Rules of thumb for judging fit:
+- A typical small self-hosted app (a Django/Flask/Node service + Postgres, a
+  handful of workers) is comfortably fine — this is what the machine already
+  runs several of at once with headroom to spare.
+- Anything that wants GPU acceleration, many parallel heavy builds, or more
+  than a couple GB of RAM per service at steady state is worth a second look —
+  4 cores and 15 GB is shared across everything already deployed.
+- Disk is the least likely constraint (hundreds of GB free) unless the app
+  stores large media/video at scale.
+- For a real answer rather than a rule of thumb — actual free RAM and load
+  right now — run `/homelab:status`, since headroom moves as other apps run.
 
 ## Reaching it
 
