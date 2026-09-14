@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# `homelab` — available on PATH whenever this plugin is enabled.
+#
+#   homelab ssh '<cmd>'      run a command on the server (hostname-checked)
+#   homelab status           what is running
+#   homelab ports            host ports in use
+#   homelab logs <app> [n]   recent logs for an app
+#   homelab caddy {show|validate|reload}
+#   homelab backup {list|run|install|pull [dir]}
+#   homelab push <dir> <app> sync a directory to ~/docker-apps/<app>
+#   homelab target           which address is being used
+#   homelab config           resolved settings
+#   homelab check            is key-based SSH working?
+set -uo pipefail
+S="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../scripts" && pwd)"
+
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  ssh)     exec "$S/hl-ssh.sh" "$@" ;;
+  status)  exec "$S/hl-status.sh" "$@" ;;
+  ports)   exec "$S/hl-ports.sh" "$@" ;;
+  logs)    exec "$S/hl-logs.sh" "$@" ;;
+  caddy)   exec "$S/hl-caddy.sh" "$@" ;;
+  backup)  exec "$S/hl-backup.sh" "$@" ;;
+  push)    exec "$S/hl-push.sh" "$@" ;;
+  target)  exec "$S/hl-target.sh" "$@" ;;
+  config)  exec "$S/hl-config.sh" "$@" ;;
+  check)   exec "$S/hl-check.sh" "$@" ;;
+  help|-h|--help) sed -n '2,13p' "$(readlink -f "${BASH_SOURCE[0]}")" | sed 's/^# \{0,1\}//' ;;
+  *) echo "unknown command: $cmd" >&2; exec "$0" help ;;
+esac

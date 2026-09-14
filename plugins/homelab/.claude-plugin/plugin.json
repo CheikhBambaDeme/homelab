@@ -1,0 +1,71 @@
+{
+  "name": "homelab",
+  "version": "1.0.0",
+  "description": "Deploy and operate apps on the lacrevetteserver homelab. Encodes the server's Docker Compose + Caddy + Tailscale conventions, its known footguns, and safety guards, so any project can be shipped to it consistently.",
+  "author": {
+    "name": "Cheikh Bamba Deme",
+    "email": "bamba.deme00@gmail.com"
+  },
+  "repository": "https://github.com/cheikh/homelab",
+  "license": "MIT",
+  "keywords": [
+    "homelab",
+    "deployment",
+    "docker",
+    "docker-compose",
+    "caddy",
+    "tailscale",
+    "self-hosting",
+    "ssh"
+  ],
+  "userConfig": {
+    "ssh_user": {
+      "type": "string",
+      "title": "SSH user",
+      "description": "Login user on the homelab server.",
+      "default": "lacrevetteserver"
+    },
+    "hostname": {
+      "type": "string",
+      "title": "Expected hostname",
+      "description": "What `hostname` must print on the far end of the SSH connection. Every remote command is refused unless it matches, so commands can never land on the wrong machine.",
+      "default": "lacrevetteserver"
+    },
+    "lan_host": {
+      "type": "string",
+      "title": "LAN address",
+      "description": "Address of the server on the home network. Tried first; falls back to the Tailscale address.",
+      "default": "192.168.1.160"
+    },
+    "ts_host": {
+      "type": "string",
+      "title": "Tailscale address",
+      "description": "Tailscale IP of the server, reachable from anywhere on the tailnet.",
+      "default": "100.82.241.64"
+    },
+    "ts_name": {
+      "type": "string",
+      "title": "Tailscale MagicDNS name",
+      "description": "The server's *.ts.net name. This is the hostname Caddy routes on and the one Tailscale holds a Let's Encrypt certificate for.",
+      "default": "lacrevetteserver.tail9991b1.ts.net"
+    },
+    "apps_root": {
+      "type": "string",
+      "title": "Apps directory",
+      "description": "Remote directory holding one folder per Compose project.",
+      "default": "~/docker-apps"
+    },
+    "lan_subnet": {
+      "type": "string",
+      "title": "LAN subnet",
+      "description": "CIDR used when opening a port to the home network with ufw.",
+      "default": "192.168.1.0/24"
+    },
+    "docs_dir": {
+      "type": "directory",
+      "title": "Homelab docs repo",
+      "description": "Local clone of the homelab documentation, kept in step after each deployment.",
+      "default": "~/Desktop/homelab"
+    }
+  }
+}

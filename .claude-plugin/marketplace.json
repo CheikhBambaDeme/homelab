@@ -1,0 +1,25 @@
+{
+  "name": "lacrevette-homelab",
+  "owner": {
+    "name": "Cheikh Bamba Deme",
+    "email": "bamba.deme00@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "homelab",
+      "source": "./plugins/homelab",
+      "description": "Deploy and operate apps on the lacrevetteserver homelab (Docker Compose + Caddy + Tailscale).",
+      "category": "deployment",
+      "keywords": [
+        "homelab",
+        "deployment",
+        "docker",
+        "caddy",
+        "tailscale"
+      ]
+    }
+  ],
+  "metadata": {
+    "description": "Plugins for deploying to and operating the lacrevetteserver homelab."
+  }
+}

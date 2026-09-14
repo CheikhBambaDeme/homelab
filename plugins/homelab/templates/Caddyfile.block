@@ -1,0 +1,15 @@
+# Add ABOVE the trailing catch-all `:80` block in ~/docker-apps/caddy/Caddyfile.
+#
+#   <hostname>:80        the :80 is required — a bare hostname makes Caddy try
+#                        to get its own certificate, which it cannot do here
+#   header_up ...        required, or an HTTPS-enforcing app redirect-loops
+#
+# Validate, then reload:
+#   docker exec caddy caddy validate --config /etc/caddy/Caddyfile
+#   docker exec caddy caddy reload   --config /etc/caddy/Caddyfile
+
+<hostname>:80 {
+    reverse_proxy <container-name>:<port> {
+        header_up X-Forwarded-Proto https
+    }
+}
