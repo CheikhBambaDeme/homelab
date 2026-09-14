@@ -19,7 +19,7 @@ Read-only. Run status, inspect, log and `curl` commands, nothing that changes
 state — no `up`, `down`, `restart`, `reload`, `ufw`, or edits to a Caddyfile or
 compose file. If a fix is obvious, write it out for someone else to apply.
 
-Every remote command goes through `homelab ssh`.
+Every remote command goes through `"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh`.
 
 ## Method
 

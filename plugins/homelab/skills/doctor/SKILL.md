@@ -2,12 +2,12 @@
 name: doctor
 description: Diagnose a homelab problem — a site that will not load, a container that will not start, HTTPS failing, or an app reachable from one device but not another. Use when something on the lacrevetteserver homelab is broken.
 argument-hint: "[app or symptom]"
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Diagnosing: $ARGUMENTS
 
-!`homelab status 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-status.sh 2>&1 || true`
 
 ## Work through this in order
 
@@ -33,7 +33,7 @@ binding `0.0.0.0:443` shadows the Tailscale interface, `tailscale serve` silentl
 loses the port, and every TLS handshake dies with nothing in any log.
 
 ```bash
-homelab ssh 'ss -tlnp | grep :443; docker ps --format "{{.Names}} {{.Ports}}" | grep 443; tailscale serve status'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'ss -tlnp | grep :443; docker ps --format "{{.Names}} {{.Ports}}" | grep 443; tailscale serve status'
 ```
 
 Fix by removing the `443:443` publish from that compose file and bringing the
@@ -58,7 +58,7 @@ Second suspect: the LAN firewall. A newly published port is reachable over
 Tailscale automatically but not from the LAN until a rule is added.
 
 ```bash
-homelab ssh 'sudo ufw status verbose'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'sudo ufw status verbose'
 ```
 
 Third: the device is simply not on the tailnet. Anything on a `*.ts.net`
@@ -71,7 +71,7 @@ design.
 context points at a socket that is not running.
 
 ```bash
-homelab ssh 'docker context use default && docker context ls'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'docker context use default && docker context ls'
 ```
 
 ### Nothing is reachable at all

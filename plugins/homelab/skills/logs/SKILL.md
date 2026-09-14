@@ -2,12 +2,12 @@
 name: logs
 description: Show recent logs for an app on the lacrevetteserver homelab. Use when investigating why a service on that server is failing, restarting, or returning errors.
 argument-hint: "<app> [lines]"
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Logs for `$ARGUMENTS`
 
-!`homelab logs $ARGUMENTS 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-logs.sh $ARGUMENTS 2>&1 || true`
 
 ## Instructions
 

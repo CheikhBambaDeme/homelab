@@ -1,6 +1,6 @@
 {
   "name": "homelab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Deploy and operate apps on the lacrevetteserver homelab. Encodes the server's Docker Compose + Caddy + Tailscale conventions, its known footguns, and safety guards, so any project can be shipped to it consistently.",
   "author": {
     "name": "Cheikh Bamba Deme",

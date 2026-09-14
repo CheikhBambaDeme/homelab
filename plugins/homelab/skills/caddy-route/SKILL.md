@@ -3,14 +3,14 @@ name: caddy-route
 description: Add, change or remove a hostname route in the homelab's Caddy reverse proxy, then validate and reload it.
 argument-hint: "[hostname] [container:port]"
 disable-model-invocation: true
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Caddy route: $ARGUMENTS
 
 ## Current Caddyfile
 
-!`homelab caddy show 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-caddy.sh show 2>&1 || true`
 
 ## Rules for editing it
 
@@ -31,23 +31,23 @@ allowed-tools: Bash(homelab:*)
 
 1. Edit `~/docker-apps/caddy/Caddyfile` on the server. Take a copy first:
    ```bash
-   homelab ssh 'cp ~/docker-apps/caddy/Caddyfile ~/docker-apps/caddy/Caddyfile.bak'
+   "${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cp ~/docker-apps/caddy/Caddyfile ~/docker-apps/caddy/Caddyfile.bak'
    ```
    Then write the new content, for example:
    ```bash
-   homelab ssh 'cat > ~/docker-apps/caddy/Caddyfile' <<'EOF'
+   "${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cat > ~/docker-apps/caddy/Caddyfile' <<'EOF'
    ...full file...
    EOF
    ```
 2. Validate and reload — validation first, because a syntax error takes down
    every site, not just the new one:
    ```bash
-   homelab caddy reload
+   "${CLAUDE_PLUGIN_ROOT}"/scripts/hl-caddy.sh reload
    ```
 3. If validation fails, restore the backup and reload before doing anything else.
 4. Verify the route resolves:
    ```bash
-   homelab ssh 'curl -sS -o /dev/null -w "%{http_code}\n" -H "Host: <hostname>" http://127.0.0.1/'
+   "${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'curl -sS -o /dev/null -w "%{http_code}\n" -H "Host: <hostname>" http://127.0.0.1/'
    ```
 
 A route on a `*.ts.net` hostname is served over HTTPS automatically —

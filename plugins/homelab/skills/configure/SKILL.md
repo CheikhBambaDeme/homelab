@@ -2,14 +2,14 @@
 name: configure
 description: Show or change which server this plugin talks to, and where its settings come from.
 disable-model-invocation: true
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Homelab plugin configuration
 
 ## Current settings
 
-!`homelab config 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-config.sh 2>&1 || true`
 
 ## How these resolve
 
@@ -47,13 +47,13 @@ a different machine.
 To override for a single command without touching the file:
 
 ```bash
-HOMELAB_HOST=100.82.241.64 homelab status
+HOMELAB_HOST=100.82.241.64 "${CLAUDE_PLUGIN_ROOT}"/scripts/hl-status.sh
 ```
 
 Then verify:
 
 ```bash
-homelab target
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-target.sh
 ```
 
 ## If the LAN address changed

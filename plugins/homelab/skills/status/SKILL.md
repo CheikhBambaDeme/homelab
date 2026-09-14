@@ -1,12 +1,12 @@
 ---
 name: status
 description: Show what is running on the lacrevetteserver homelab — containers, disk, listening ports, firewall, Tailscale and Caddy. Use when asked what is running on that server, whether it is up, or what state it is in.
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Homelab status
 
-!`homelab status 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-status.sh 2>&1 || true`
 
 ## Reading this
 

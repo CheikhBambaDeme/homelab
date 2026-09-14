@@ -2,7 +2,7 @@
 name: setup-ssh
 description: Set up key-based SSH to the homelab server so this plugin's scripts can run without a password prompt.
 disable-model-invocation: true
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Set up key-based SSH to the homelab
@@ -12,7 +12,7 @@ so they all fail until a key is in place. This is a one-time fix per machine.
 
 ## Current state
 
-!`homelab check 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-check.sh 2>&1 || true`
 
 ## Steps
 
@@ -48,7 +48,7 @@ ssh-copy-id -i ~/.ssh/id_ed25519_homelab.pub lacrevetteserver@100.82.241.64
 ### 3. Confirm
 
 ```bash
-homelab target
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-target.sh
 ```
 
 It should print the address it connected on. That means key auth works and the

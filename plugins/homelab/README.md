@@ -79,32 +79,35 @@ bitten by, or something irreversible.
 
 ## Scripts
 
-`bin/homelab` is on `PATH` whenever the plugin is enabled.
+Every skill calls these directly by path — no `bin/` directory and nothing
+added to `PATH`, so the plugin stays installable through claude.ai's hosted
+distribution, which requires every executable entry point to be visible on
+the admin approval surface (hooks, skills, MCP servers — not an opaque `bin/`).
 
 ```bash
-homelab status                      # containers, disk, ports, ufw, Tailscale, Caddy
-homelab ports                       # what is already taken
-homelab logs agelcom 100
-homelab ssh 'docker ps'
-homelab caddy show|validate|reload
-homelab backup list|run|install|pull [dir]
-homelab push . myapp
-homelab target                      # which address is in use
-homelab config                      # resolved settings
-homelab check                       # is key-based SSH working?
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-status.sh                      # containers, disk, ports, ufw, Tailscale, Caddy
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ports.sh                       # what is already taken
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-logs.sh agelcom 100
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'docker ps'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-caddy.sh show|validate|reload
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-backup.sh list|run|install|pull [dir]
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-push.sh . myapp
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-target.sh                      # which address is in use
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-config.sh                      # resolved settings
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-check.sh                       # is key-based SSH working?
 ```
 
-The skills drive the same CLI, so one permission rule covers all of them:
+One permission rule covers all of them:
 
 ```json
-{ "permissions": { "allow": ["Bash(homelab:*)"] } }
+{ "permissions": { "allow": ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)"] } }
 ```
 
 Each skill already declares that in its `allowed-tools`, which covers the turn
 it runs in; put it in `.claude/settings.json` if you would rather never be
-asked. If `bin/` is not on `PATH` in your setup, the same scripts are at
-`scripts/hl-*.sh` inside the plugin.
-`homelab ssh` is the important one: it runs the hostname check and the command
+asked.
+
+`hl-ssh.sh` is the important one: it runs the hostname check and the command
 in the same remote shell, so a command cannot land on a machine other than the
 one that was checked. Commands were once run against the wrong machine during
 this server's setup, which is why it works that way.
@@ -119,7 +122,7 @@ Defaults are the real server's. Resolution order, highest first:
 4. built-in defaults
 
 ```bash
-HOMELAB_HOST=100.82.241.64 homelab status     # force the Tailscale path
+HOMELAB_HOST=100.82.241.64 "${CLAUDE_PLUGIN_ROOT}"/scripts/hl-status.sh     # force the Tailscale path
 ```
 
 `HOMELAB_HOSTNAME` is the safety check, not a label. Change it only when
@@ -134,9 +137,9 @@ plugins/homelab/
 ├── agents/                       deployer, troubleshooter
 ├── hooks/hooks.json
 ├── scripts/                      hl-ssh, hl-push, hl-status, hl-ports,
-│   └── hooks/                     hl-logs, hl-caddy, hl-backup, config.sh
-├── templates/                    push.sh, Caddyfile block, backup script
-└── bin/homelab
+│   └── hooks/                     hl-logs, hl-caddy, hl-backup, hl-config,
+│                                  hl-check, config.sh
+└── templates/                    push.sh, Caddyfile block, backup script
 ```
 
 ## Pointing it at a different server

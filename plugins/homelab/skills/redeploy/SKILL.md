@@ -3,7 +3,7 @@ name: redeploy
 description: Push this project's latest code to the lacrevetteserver homelab and restart it.
 argument-hint: "[app-name]"
 disable-model-invocation: true
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Redeploy to lacrevetteserver
@@ -28,8 +28,8 @@ If `deploy/push.sh` exists, use it — it carries any build step the app needs
 Otherwise run the build yourself, then:
 
 ```bash
-homelab push . <app>
-homelab ssh 'cd ~/docker-apps/<app> && docker compose up -d --build && docker compose ps'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-push.sh . <app>
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cd ~/docker-apps/<app> && docker compose up -d --build && docker compose ps'
 ```
 
 The remote `.env` is excluded from the sync and stays as it is.
@@ -41,13 +41,13 @@ run them explicitly, and **take a dump first** — this server has no off-machin
 backups unless `/homelab:backup pull` has been run:
 
 ```bash
-homelab ssh 'cd ~/docker-apps/<app> && docker compose exec -T db pg_dump -U <user> <db> | gzip > ~/backups/<app>-pre-migrate-$(date +%F_%H%M).sql.gz'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cd ~/docker-apps/<app> && docker compose exec -T db pg_dump -U <user> <db> | gzip > ~/backups/<app>-pre-migrate-$(date +%F_%H%M).sql.gz'
 ```
 
 ## 4. Verify
 
 ```bash
-homelab logs <app> 50
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-logs.sh <app> 50
 ```
 
 Confirm a clean start rather than a restart loop, then check the app's URL

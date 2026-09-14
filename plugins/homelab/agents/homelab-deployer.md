@@ -27,7 +27,7 @@ dependencies. Do not write a `docker-compose.yml` from the framework's name
 alone — the port it listens on, the environment it reads, and whether it needs
 a secure context all change the shape of the deployment.
 
-Run every remote command through `homelab ssh`.
+Run every remote command through `"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh`.
 It refuses to execute anything unless `hostname` on the far end matches. Never
 run `docker`, `ufw` or `tailscale` for that server as a local command.
 

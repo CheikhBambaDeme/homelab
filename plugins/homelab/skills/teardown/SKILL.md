@@ -3,7 +3,7 @@ name: teardown
 description: Remove an app from the lacrevetteserver homelab cleanly — containers, Caddy route, firewall rule and files.
 argument-hint: "<app>"
 disable-model-invocation: true
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Tear down `$ARGUMENTS`
@@ -17,8 +17,8 @@ State plainly what will be destroyed and get explicit confirmation. Then back up
 regardless — volumes are not recoverable:
 
 ```bash
-homelab backup run
-homelab backup pull ~/homelab-backups
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-backup.sh run
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-backup.sh pull ~/homelab-backups
 ```
 
 Note that `~/docker-apps/<app>/.env` is the only copy of that app's generated
@@ -27,7 +27,7 @@ secrets. If they might be wanted again, copy it off first.
 ## 1. Stop the stack
 
 ```bash
-homelab ssh 'cd ~/docker-apps/<app> && docker compose down'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cd ~/docker-apps/<app> && docker compose down'
 ```
 
 Without `-v`. Volumes are kept deliberately at this stage, and a hook in this
@@ -39,7 +39,7 @@ Delete the app's block from `~/docker-apps/caddy/Caddyfile`, keeping the trailin
 catch-all `:80` block last, then validate and reload:
 
 ```bash
-homelab caddy reload
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-caddy.sh reload
 ```
 
 A route pointing at a container that no longer exists makes Caddy return 502 for
@@ -50,8 +50,8 @@ that hostname rather than failing loudly, so this is easy to forget.
 Only if the app had a dedicated published port:
 
 ```bash
-homelab ssh 'sudo ufw status numbered'
-homelab ssh 'sudo ufw delete <number>'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'sudo ufw status numbered'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'sudo ufw delete <number>'
 ```
 
 Needs a sudo password, so hand this one to the person to run.
@@ -59,8 +59,8 @@ Needs a sudo password, so hand this one to the person to run.
 ## 4. Remove files and volumes
 
 ```bash
-homelab ssh 'ls ~/docker-apps/<app>'
-homelab ssh 'docker volume ls --filter label=com.docker.compose.project=<app>'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'ls ~/docker-apps/<app>'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'docker volume ls --filter label=com.docker.compose.project=<app>'
 ```
 
 Show both lists and confirm again before deleting. Volume removal is refused by

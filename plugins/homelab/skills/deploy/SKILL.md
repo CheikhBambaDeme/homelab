@@ -3,7 +3,7 @@ name: deploy
 description: Deploy this project to the lacrevetteserver homelab for the first time.
 argument-hint: "[app-name]"
 disable-model-invocation: true
-allowed-tools: Bash(homelab:*)
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
 # Deploy to lacrevetteserver
@@ -16,11 +16,11 @@ following the pattern every other app on that server already uses. App name:
 
 Ports and apps already there:
 
-!`homelab ports 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ports.sh 2>&1 || true`
 
 Current Caddy routes:
 
-!`homelab caddy show 2>&1 || true`
+!`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-caddy.sh show 2>&1 || true`
 
 If the section above says the server is unreachable, stop and resolve that
 first — usually `/homelab:setup-ssh`, sometimes just not being on the tailnet.
@@ -74,8 +74,8 @@ Secrets are generated on the server and stay there. Do not write them into any
 local file, and do not echo them back in full.
 
 ```bash
-homelab ssh 'mkdir -p ~/docker-apps/<app>'
-homelab ssh 'cd ~/docker-apps/<app> && \
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'mkdir -p ~/docker-apps/<app>'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cd ~/docker-apps/<app> && \
   { echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)"; \
     echo "SECRET_KEY=$(openssl rand -base64 48)"; } > .env && chmod 600 .env && ls -l .env'
 ```
@@ -85,7 +85,7 @@ Add whatever other non-secret environment the app needs to that same file.
 ## 5. Push the source
 
 ```bash
-homelab push . <app>
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-push.sh . <app>
 ```
 
 This rsyncs the working directory to `~/docker-apps/<app>/`, excluding `.git`,
@@ -109,7 +109,7 @@ The `:80` and the `X-Forwarded-Proto` line are both required — see
 [reference.md](reference.md) for why each one bites. Then:
 
 ```bash
-homelab caddy reload
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-caddy.sh reload
 ```
 
 `/homelab:caddy-route` does this edit-validate-reload cycle for you.
@@ -117,7 +117,7 @@ homelab caddy reload
 ## 7. Open the firewall (dedicated-port mode only)
 
 ```bash
-homelab ssh 'sudo ufw allow from 192.168.1.0/24 to any port <PORT> proto tcp'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'sudo ufw allow from 192.168.1.0/24 to any port <PORT> proto tcp'
 ```
 
 Tailscale access already works without this; the rule is only for the LAN. It
@@ -126,13 +126,13 @@ needs a sudo password, so expect to run it in a terminal yourself.
 ## 8. Bring it up
 
 ```bash
-homelab ssh 'cd ~/docker-apps/<app> && docker compose up -d --build && docker compose ps'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'cd ~/docker-apps/<app> && docker compose up -d --build && docker compose ps'
 ```
 
 Then check the logs actually show a clean start rather than a restart loop:
 
 ```bash
-homelab logs <app> 50
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-logs.sh <app> 50
 ```
 
 ## 9. Verify properly
@@ -141,7 +141,7 @@ A deployment is not done until both paths are checked — they are gated by
 different rules and it is easy to leave one broken.
 
 ```bash
-homelab ssh 'curl -sS -o /dev/null -w "%{http_code}\n" -H "Host: <hostname>" http://127.0.0.1/'
+"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh 'curl -sS -o /dev/null -w "%{http_code}\n" -H "Host: <hostname>" http://127.0.0.1/'
 curl -sS -o /dev/null -w "%{http_code}\n" http://192.168.1.160/ -H "Host: <hostname>"   # LAN
 curl -sS -o /dev/null -w "%{http_code}\n" https://<host>.tail9991b1.ts.net/             # Tailscale + TLS
 ```

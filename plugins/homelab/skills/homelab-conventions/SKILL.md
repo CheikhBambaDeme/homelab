@@ -17,7 +17,7 @@ family use. Nothing is exposed to the public internet, and there is no domain.
 | MagicDNS | `lacrevetteserver.tail9991b1.ts.net` | anywhere on the tailnet, with real TLS |
 
 Never run a command intended for the server on the local machine. Use
-`homelab ssh '<command>'`, which refuses to execute
+`"${CLAUDE_PLUGIN_ROOT}"/scripts/hl-ssh.sh '<command>'`, which refuses to execute
 anything unless `hostname` on the far end matches. Commands have landed on the
 wrong machine on this setup before, which is why that wrapper exists.
 
